@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:16
+    container_name: gtmkit-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: gtmkit
+      POSTGRES_PASSWORD: gtmkit_password
+      POSTGRES_DB: gtmkit
+    volumes:
+      - gtmkit_db:/var/lib/postgresql/data
+
+volumes:
+  gtmkit_db:

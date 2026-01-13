@@ -1,0 +1,97 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum OrderStatus {
+  created
+  paid
+  brief_submitted
+  generating
+  generated
+  delivered
+  error
+  refunded
+}
+
+model Customer {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  countryCode String?  @db.VarChar(2)
+  createdAt   DateTime @default(now())
+
+  orders      Order[]
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  status      OrderStatus @default(created)
+  amountCents Int?
+  currency    String?
+  promptKey   String      @default("gtm_eu_core")
+  promptVersion Int       @default(1)
+  countryCode String?     @db.VarChar(2)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  customerId  String?
+  customer    Customer?   @relation(fields: [customerId], references: [id])
+
+  brief       Brief?
+  result      Result?
+  payments    Payment[]
+}
+
+model Payment {
+  id                  String   @id @default(cuid())
+  orderId             String
+  paddleTransactionId String?  @unique
+  status              String
+  payload             Json?
+  createdAt           DateTime @default(now())
+
+  order               Order    @relation(fields: [orderId], references: [id])
+}
+
+model Brief {
+  id        String   @id @default(cuid())
+  orderId   String   @unique
+  payload   Json
+  createdAt DateTime @default(now())
+
+  order     Order    @relation(fields: [orderId], references: [id])
+}
+
+model Result {
+  id                 String    @id @default(cuid())
+  orderId            String    @unique
+  resultText         String    @db.Text
+  promptKey          String    @default("gtm_eu_core")
+  promptVersion      Int       @default(1)
+  promptSnapshot     String    @db.Text @default("")
+  modelUsed          String?
+  provider           String?   @default("openai")
+  providerResponseId String?
+  errorMessage       String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  emailSentAt        DateTime?
+
+  order       Order     @relation(fields: [orderId], references: [id])
+}
+
+model WebhookEvent {
+  id          String   @id @default(cuid())
+  provider    String   @default("paddle")
+  eventId     String   @unique
+  eventType   String
+  payload     Json
+  receivedAt  DateTime @default(now())
+  processedAt DateTime?
+  processingResult String?
+
+  @@index([provider, eventType])
+}

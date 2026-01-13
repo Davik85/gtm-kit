@@ -1,0 +1,6 @@
+ALTER TABLE "Result"
+ADD COLUMN "modelUsed" TEXT,
+ADD COLUMN "provider" TEXT,
+ADD COLUMN "providerResponseId" TEXT,
+ADD COLUMN "errorMessage" TEXT,
+ADD COLUMN "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
