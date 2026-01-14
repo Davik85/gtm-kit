@@ -10,6 +10,7 @@ export default function StartPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [countryCode, setCountryCode] = useState<string | null>(null)
+  const [tier, setTier] = useState<'base' | 'plus' | 'pro'>('base')
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -38,6 +39,7 @@ export default function StartPage() {
         },
         body: JSON.stringify({
           email: trimmedEmail,
+          tier,
           ...(countryCode ? { countryCode } : {}),
         }),
       })
@@ -91,6 +93,20 @@ export default function StartPage() {
           label="Country"
           optional
         />
+
+        <label className="flex flex-col gap-2 text-sm font-medium">
+          Plan tier
+          <select
+            className="rounded border border-gray-300 px-3 py-2 text-base"
+            name="tier"
+            value={tier}
+            onChange={(event) => setTier(event.target.value as 'base' | 'plus' | 'pro')}
+          >
+            <option value="base">Base</option>
+            <option value="plus">Plus</option>
+            <option value="pro">Pro</option>
+          </select>
+        </label>
 
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
 

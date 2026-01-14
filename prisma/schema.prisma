@@ -17,6 +17,12 @@ enum OrderStatus {
   refunded
 }
 
+enum OrderTier {
+  base
+  plus
+  pro
+}
+
 model Customer {
   id          String   @id @default(cuid())
   email       String   @unique
@@ -29,6 +35,7 @@ model Customer {
 model Order {
   id          String      @id @default(cuid())
   status      OrderStatus @default(created)
+  tier        OrderTier   @default(base)
   amountCents Int?
   currency    String?
   promptKey   String      @default("gtm_eu_core")
