@@ -293,11 +293,10 @@ export default function ResultClient({ orderId }: ResultClientProps) {
     }
   }
 
-  const handleDownload = (format: 'docx' | 'pdf' | 'txt' = 'docx') => {
+  const handleDownload = () => {
     if (!isReady) return
     const encodedOrderId = encodeURIComponent(orderId)
-    const formatParam = `?format=${format}`
-    window.location.href = `/api/orders/${encodedOrderId}/download${formatParam}`
+    window.location.href = `/api/orders/${encodedOrderId}/download`
   }
 
   return (
@@ -340,29 +339,13 @@ export default function ResultClient({ orderId }: ResultClientProps) {
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={() => handleDownload('docx')}
+                onClick={handleDownload}
                 disabled={!isReady}
                 className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Download Word (.docx)
               </button>
-              <button
-                type="button"
-                onClick={() => handleDownload('pdf')}
-                disabled={!isReady}
-                className="rounded border border-gray-300 px-4 py-2 text-sm font-medium text-gray-900 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                Download PDF (.pdf)
-              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => handleDownload('txt')}
-              disabled={!isReady}
-              className="text-sm font-medium text-gray-700 underline underline-offset-4 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Download as .txt
-            </button>
             <button
               type="button"
               onClick={handleCopy}
