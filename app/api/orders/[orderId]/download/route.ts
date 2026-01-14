@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { normalizePlanToMarkdown } from '@/lib/formatPlan'
-import { buildDocxFromMarkdown, buildPdfFromMarkdown } from '@/lib/planExport'
+import { buildDocxFromMarkdown } from '@/lib/planExport'
 import { prisma } from '@/lib/prisma'
 
 export const runtime = 'nodejs'
@@ -41,29 +41,17 @@ export async function GET(
   const normalized = normalizePlanToMarkdown(raw)
   const safeName = `gtm-kit-${orderId}`
 
-  if (format === 'txt') {
-    return new Response(normalized, {
-      status: 200,
-      headers: {
-        'Content-Type': 'text/plain; charset=utf-8',
-        'Content-Disposition': `attachment; filename="${safeName}.txt"`,
-        'Cache-Control': 'no-store',
+  if (format !== 'docx') {
+    return new Response(
+      JSON.stringify({ error: 'Unsupported format. Only docx is available.' }),
+      {
+        status: 400,
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'no-store',
+        },
       },
-    })
-  }
-
-  if (format === 'pdf') {
-    const pdfBytes = await buildPdfFromMarkdown(normalized, 'Go-to-market plan')
-    const pdfBody = toArrayBuffer(pdfBytes)
-
-    return new Response(pdfBody, {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${safeName}.pdf"`,
-        'Cache-Control': 'no-store',
-      },
-    })
+    )
   }
 
   // default: docx
