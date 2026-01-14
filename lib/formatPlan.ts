@@ -5,16 +5,25 @@ const HORIZONTAL_RULE_PATTERN = /^---\s*$/
 // Bullets / ordered items
 const BULLET_PREFIX_PATTERN = /^\s*(?:[-*•\u2013\u2014]|\d+[.)])\s+/
 
-// Inline labels we want as normal text, not headings
+// Lines that are "just a marker" (cause stray dots/bullets in output)
+const LONELY_BULLET_LINE_PATTERN = /^\s*(?:[-*•\u2013\u2014]|\d+[.)])\s*$/
+
+// Inline labels we want as normal text, not headings / list starters
 const INLINE_LABELS: Record<string, string> = {
   who: 'Who',
   jtbd: 'JTBD',
   triggers: 'Triggers',
+
   barriers: 'Barriers',
+  'barriers/objections': 'Barriers/objections',
+
   'decision criteria': 'Decision criteria',
   alternatives: 'Alternatives',
   'where to reach': 'Where to reach',
+
   'value/ability to pay signals': 'Value/ability to pay signals',
+  'value & ability to pay': 'Value & ability to pay',
+  'value and ability to pay': 'Value and ability to pay',
 }
 
 const INLINE_LABEL_KEYS = Object.keys(INLINE_LABELS).sort(
@@ -34,10 +43,13 @@ const LABEL_LINE_PATTERN = new RegExp(
  * 1) keep the sentence as-is on the current line
  * 2) move "Top starter channels:" to a NEW line (so it can become a mini-heading + list opener)
  *
- * We only split when the heading is at the END of the line and has a trailing ":".
+ * We only split when the heading is at the END of the line and has a trailing ":"
  */
 const INLINE_STAGE_HEADING_AT_END_PATTERN =
-  /^(.*?)([.!?])(["”’']?)\s+([A-Z][^:\n]{2,80}):\s*$/ // keep conservative to avoid false positives
+  /^(.*?)([.!?])(["”’']?)\s+([A-Z][^:\n]{2,80}):\s*$/ // conservative to avoid false positives
+
+const isLonelyBulletLine = (trimmed: string) =>
+  LONELY_BULLET_LINE_PATTERN.test(trimmed)
 
 const normalizeBulletMarker = (line: string) => {
   // Normalize bullets to "- "
@@ -73,6 +85,27 @@ const toInlineLabel = (text: string) => {
   return `**${canonical}:** ${rest}`
 }
 
+/**
+ * If a markdown heading line looks like an action/sentence, do NOT keep it as heading.
+ * Convert it into a bullet item to avoid huge typography on the result page.
+ */
+const shouldDemoteHeadingToBullet = (text: string) => {
+  const t = text.trim()
+  if (!t) return false
+
+  // Headings that end like a sentence are usually action items
+  if (/[.!?]$/.test(t)) return true
+
+  // Very long headings are almost always action items
+  if (t.length >= 80) return true
+
+  // Many words => more likely a sentence/action than a section title
+  const words = t.split(/\s+/).filter(Boolean).length
+  if (words >= 12) return true
+
+  return false
+}
+
 const clampMarkdownHeading = (line: string) => {
   const m = line.match(MARKDOWN_HEADING_PATTERN)
   if (!m) return line
@@ -84,6 +117,9 @@ const clampMarkdownHeading = (line: string) => {
   // If this is actually "Who: ..." etc — convert to inline label paragraph
   const inline = toInlineLabel(text)
   if (inline) return inline
+
+  // Demote "sentence-like" headings (common model behavior) to bullet list items
+  if (shouldDemoteHeadingToBullet(text)) return `- ${text}`
 
   // Clamp heading levels so there is never huge H1
   if (level <= 1) return `## ${text}`
@@ -205,6 +241,12 @@ export function normalizePlanToMarkdown(raw: string): string {
       const line = parts[p] ?? ''
       const trimmed = line.trim()
 
+      // Drop garbage "just a bullet marker" lines (they create lonely dots on the page)
+      if (trimmed && isLonelyBulletLine(trimmed)) {
+        pushBlankIfNeeded()
+        continue
+      }
+
       // Stop list mode on numbered section headers or horizontal rules
       if (
         listMode &&
@@ -239,7 +281,10 @@ export function normalizePlanToMarkdown(raw: string): string {
 
         // If already bullet — keep it (normalized)
         if (BULLET_PREFIX_PATTERN.test(trimmed)) {
-          out.push(normalizeBulletMarker(trimmed))
+          const normalized = normalizeBulletMarker(trimmed).trim()
+          // If after normalization it becomes an empty bullet, drop it
+          if (!normalized || isLonelyBulletLine(normalized)) continue
+          out.push(normalized)
           continue
         }
 

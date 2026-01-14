@@ -7,20 +7,11 @@ export const runtime = 'nodejs'
 
 const NOT_FOUND = 'Result not found.'
 const BAD_REQUEST = 'Missing orderId.'
-const TITLE = 'Go-to-market plan'
 
-const asBinaryResponse = (bytes: Uint8Array, mimeType: string, filename: string) => {
-  const arrayBuffer = new Uint8Array(bytes).buffer
-  const body = new Blob([arrayBuffer], { type: mimeType })
-
-  return new Response(body, {
-    status: 200,
-    headers: {
-      'Content-Type': mimeType,
-      'Content-Disposition': `attachment; filename="${filename}"`,
-      'Cache-Control': 'no-store',
-    },
-  })
+const toArrayBuffer = (bytes: Uint8Array): ArrayBuffer => {
+  // Create a fresh copy to guarantee a plain ArrayBuffer (not SharedArrayBuffer)
+  const copy = Uint8Array.from(bytes)
+  return copy.buffer
 }
 
 export async function GET(
@@ -29,16 +20,12 @@ export async function GET(
 ): Promise<Response> {
   const { orderId: rawOrderId } = await context.params
   const orderId = (rawOrderId ?? '').trim()
-
   if (!orderId) {
     return new Response(BAD_REQUEST, { status: 400 })
   }
 
   const url = new URL(req.url)
   const format = (url.searchParams.get('format') ?? 'docx').toLowerCase()
-
-  // Keep filename safe and simple
-  const safeName = `gtm-kit-${orderId.replace(/[^a-zA-Z0-9-_]/g, '_')}`
 
   const row = await prisma.result.findUnique({
     where: { orderId },
@@ -52,6 +39,7 @@ export async function GET(
 
   // IMPORTANT: export must match the on-page formatting rules
   const normalized = normalizePlanToMarkdown(raw)
+  const safeName = `gtm-kit-${orderId}`
 
   if (format === 'txt') {
     return new Response(normalized, {
@@ -65,15 +53,30 @@ export async function GET(
   }
 
   if (format === 'pdf') {
-    const pdfBytes = await buildPdfFromMarkdown(normalized, TITLE)
-    return asBinaryResponse(pdfBytes, 'application/pdf', `${safeName}.pdf`)
+    const pdfBytes = await buildPdfFromMarkdown(normalized, 'Go-to-market plan')
+    const pdfBody = toArrayBuffer(pdfBytes)
+
+    return new Response(pdfBody, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="${safeName}.pdf"`,
+        'Cache-Control': 'no-store',
+      },
+    })
   }
 
   // default: docx
-  const docxBytes = await buildDocxFromMarkdown(normalized, TITLE)
-  return asBinaryResponse(
-    docxBytes,
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    `${safeName}.docx`,
-  )
+  const docxBytes = await buildDocxFromMarkdown(normalized, 'Go-to-market plan')
+  const docxBody = toArrayBuffer(docxBytes)
+
+  return new Response(docxBody, {
+    status: 200,
+    headers: {
+      'Content-Type':
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'Content-Disposition': `attachment; filename="${safeName}.docx"`,
+      'Cache-Control': 'no-store',
+    },
+  })
 }
