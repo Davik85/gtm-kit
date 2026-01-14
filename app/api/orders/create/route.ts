@@ -7,16 +7,29 @@ export const runtime = 'nodejs'
 type CreateOrderPayload = {
   email?: string
   countryCode?: string
+  tier?: string
 }
+
+const allowedTiers = new Set(['base', 'plus', 'pro'] as const)
+type OrderTier = 'base' | 'plus' | 'pro'
 
 const normalizeEmail = (value: string) => value.trim().toLowerCase()
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as CreateOrderPayload
   const email = typeof body.email === 'string' ? normalizeEmail(body.email) : ''
   let countryCode: string | undefined
+  let tier: OrderTier = 'base'
 
   if (!email || !email.includes('@')) {
     return NextResponse.json({ error: 'Invalid email' }, { status: 400 })
+  }
+
+  if (typeof body.tier === 'string') {
+    if (allowedTiers.has(body.tier as OrderTier)) {
+      tier = body.tier as OrderTier
+    } else {
+      return NextResponse.json({ error: 'Invalid tier' }, { status: 400 })
+    }
   }
 
   if (typeof body.countryCode === 'string') {
@@ -48,6 +61,7 @@ export async function POST(request: Request) {
   const order = await prisma.order.create({
     data: {
       status: 'created',
+      tier,
       promptKey: 'gtm_eu_core',
       promptVersion: 1,
       customerId: customer.id,
