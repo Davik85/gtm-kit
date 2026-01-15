@@ -28,6 +28,7 @@ type ResultResponse = {
 
 type ResultClientProps = {
   orderId: string
+  accessToken: string
 }
 
 type ResultStatus = 'generating' | 'ready' | 'error'
@@ -42,7 +43,7 @@ const GENERATING_MESSAGE =
   'We are generating your go-to-market plan. This may take a few minutes. Keep this page open — it will update automatically.'
 const VIEW_BRIEF_LABEL = 'View brief'
 
-export default function ResultClient({ orderId }: ResultClientProps) {
+export default function ResultClient({ orderId, accessToken }: ResultClientProps) {
   const [resultText, setResultText] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState<ResultStatus>('generating')
@@ -160,7 +161,8 @@ export default function ResultClient({ orderId }: ResultClientProps) {
     }
 
     const fetchResult = async () => {
-      const resultResponse = await fetch(`/api/results/${orderId}`, {
+      const tokenParam = encodeURIComponent(accessToken)
+      const resultResponse = await fetch(`/api/results/${orderId}?token=${tokenParam}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -234,7 +236,7 @@ export default function ResultClient({ orderId }: ResultClientProps) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ orderId }),
+        body: JSON.stringify({ orderId, accessToken }),
         cache: 'no-store',
       })
         .then(async (generateResponse) => {
@@ -279,7 +281,7 @@ export default function ResultClient({ orderId }: ResultClientProps) {
       isActive = false
       clearPolling()
     }
-  }, [orderId])
+  }, [orderId, accessToken])
 
   const handleCopy = async () => {
     if (!normalizedContent) return
@@ -296,7 +298,8 @@ export default function ResultClient({ orderId }: ResultClientProps) {
   const handleDownload = () => {
     if (!isReady) return
     const encodedOrderId = encodeURIComponent(orderId)
-    window.location.href = `/api/orders/${encodedOrderId}/download`
+    const encodedToken = encodeURIComponent(accessToken)
+    window.location.href = `/api/orders/${encodedOrderId}/download?token=${encodedToken}`
   }
 
   return (

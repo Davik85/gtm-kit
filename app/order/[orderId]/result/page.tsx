@@ -1,4 +1,4 @@
-import ResultAccessPage from './ResultAccessPage'
+import ResultAccessPage from '@/app/result/[orderId]/ResultAccessPage'
 
 type PageProps = {
   params: Promise<{ orderId: string }>
@@ -7,7 +7,7 @@ type PageProps = {
 
 export const dynamic = 'force-dynamic'
 
-export default async function ResultPage({ params, searchParams }: PageProps) {
+export default async function OrderResultPage({ params, searchParams }: PageProps) {
   const { orderId } = await params
   const { token } = await searchParams
 

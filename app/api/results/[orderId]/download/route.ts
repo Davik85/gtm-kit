@@ -8,7 +8,7 @@ type RouteContext = {
   params: Promise<{ orderId?: string }>
 }
 
-export async function GET(_: Request, ctx: RouteContext) {
+export async function GET(request: Request, ctx: RouteContext) {
   const { orderId: rawOrderId } = await ctx.params
   const orderId = rawOrderId?.trim() ?? ''
 
@@ -19,19 +19,30 @@ export async function GET(_: Request, ctx: RouteContext) {
     )
   }
 
-  const result = await prisma.result.findUnique({
-    where: { orderId },
-    select: { resultText: true },
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: { accessToken: true, result: { select: { resultText: true } } },
   })
 
-  if (!result) {
+  const accessToken = order?.accessToken ?? ''
+  const requestToken = new URL(request.url).searchParams.get('token')?.trim() ?? ''
+
+  if (!order || !requestToken || accessToken !== requestToken) {
     return NextResponse.json(
       { error: 'Not found' },
       { status: 404, headers: { 'Cache-Control': 'no-store' } },
     )
   }
 
-  const normalizedText = normalizePlanToMarkdown(result.resultText ?? '')
+  const rawResult = order.result?.resultText?.trim()
+  if (!rawResult) {
+    return NextResponse.json(
+      { error: 'Not found' },
+      { status: 404, headers: { 'Cache-Control': 'no-store' } },
+    )
+  }
+
+  const normalizedText = normalizePlanToMarkdown(rawResult)
   return new NextResponse(normalizedText, {
     headers: {
       'Content-Type': 'text/plain; charset=utf-8',

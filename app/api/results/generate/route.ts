@@ -2,12 +2,14 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db/prisma'
 import { normalizePlanToMarkdown } from '@/lib/formatPlan'
 import { openai } from '@/lib/openaiClient'
+import { buildOrderResultUrl } from '@/lib/orderLinks.server'
 import { PROMPTS, type PromptKey, getPromptTemplate } from '@/lib/prompts/registry'
 
 export const runtime = 'nodejs'
 
 type GenerateResultPayload = {
   orderId?: string
+  accessToken?: string
 }
 
 type TransactionClient = any
@@ -107,6 +109,10 @@ const buildContinuationInput = (assembledText: string) => {
 
 const getOrderId = (payload: GenerateResultPayload) => {
   return typeof payload.orderId === 'string' ? payload.orderId.trim() : ''
+}
+
+const getAccessToken = (payload: GenerateResultPayload) => {
+  return typeof payload.accessToken === 'string' ? payload.accessToken.trim() : ''
 }
 
 const toErrorMessage = (error: unknown) => {
@@ -217,6 +223,7 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json().catch(() => ({}))) as GenerateResultPayload
     orderId = getOrderId(body)
+    const accessToken = getAccessToken(body)
 
     if (!orderId) {
       logGenerateStatus({ orderId: 'unknown', status: 'invalid' })
@@ -228,6 +235,7 @@ export async function POST(request: Request) {
       select: {
         id: true,
         status: true,
+        accessToken: true,
         promptKey: true,
         promptVersion: true,
         countryCode: true,
@@ -251,6 +259,13 @@ export async function POST(request: Request) {
       return jsonResponse({ error: ERROR_ORDER_NOT_FOUND }, { status: 404 })
     }
 
+    if (!accessToken || order.accessToken !== accessToken) {
+      logGenerateStatus({ orderId, status: 'access_denied' })
+      return jsonResponse({ error: 'Access denied' }, { status: 404 })
+    }
+
+    const resultLink = buildOrderResultUrl(orderId, accessToken)
+
     if (order.status === ORDER_STATUS_GENERATED || order.result?.resultText) {
       const existingResult = order.result ?? (await fetchExistingResultInfo(orderId))
 
@@ -266,6 +281,7 @@ export async function POST(request: Request) {
           status: 'ready',
           code: 'already_generated',
           resultId: existingResult.id,
+          resultLink,
         })
       }
     }
@@ -331,6 +347,7 @@ export async function POST(request: Request) {
           status: 'ready',
           code: 'already_generated',
           resultId: existingResult.id,
+          resultLink,
         })
       }
 
@@ -502,16 +519,17 @@ export async function POST(request: Request) {
     }
 
     logGenerateStatus({ orderId, status: 'ready', resultId: createdResultId })
-    return jsonResponse({
-      ok: true,
-      orderId,
-      status: 'ready',
-      resultId: createdResultId,
-      reused: false,
-      resultText,
-      chunksCount: chunks.length,
-      totalChars: resultText.length,
-      finalFinishReason: finishReason ?? 'unknown',
+      return jsonResponse({
+        ok: true,
+        orderId,
+        status: 'ready',
+        resultId: createdResultId,
+        reused: false,
+        resultLink,
+        resultText,
+        chunksCount: chunks.length,
+        totalChars: resultText.length,
+        finalFinishReason: finishReason ?? 'unknown',
     })
   } catch (error) {
     const errorMessage = toErrorMessage(error)
