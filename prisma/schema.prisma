@@ -38,6 +38,8 @@ model Order {
   tier        OrderTier   @default(base)
   amountCents Int?
   currency    String?
+  accessToken String      @unique
+  accessTokenCreatedAt DateTime @default(now())
   promptKey   String      @default("gtm_eu_core")
   promptVersion Int       @default(1)
   countryCode String?     @db.VarChar(2)

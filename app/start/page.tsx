@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useState, type FormEvent } from 'react'
 import CountrySelect from '@/components/CountrySelect'
+import { orderAccessTokenStorageKey } from '@/lib/orderLinks'
 
 const isValidEmail = (value: string) => value.includes('@')
 
@@ -46,12 +47,20 @@ export default function StartPage() {
 
       const data = (await response.json().catch(() => ({}))) as {
         orderId?: string
+        accessToken?: string
         error?: string
       }
 
       if (!response.ok || !data.orderId) {
         setError(data.error || 'Unable to create order. Please try again.')
         return
+      }
+
+      if (data.accessToken) {
+        sessionStorage.setItem(
+          orderAccessTokenStorageKey(data.orderId),
+          data.accessToken,
+        )
       }
 
       router.push(`/brief/${data.orderId}`)

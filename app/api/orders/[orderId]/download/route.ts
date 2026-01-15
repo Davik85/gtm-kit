@@ -26,13 +26,18 @@ export async function GET(
 
   const url = new URL(req.url)
   const format = (url.searchParams.get('format') ?? 'docx').toLowerCase()
+  const requestToken = url.searchParams.get('token')?.trim() ?? ''
 
-  const row = await prisma.result.findUnique({
-    where: { orderId },
-    select: { resultText: true },
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: { accessToken: true, result: { select: { resultText: true } } },
   })
 
-  const raw = row?.resultText?.trim()
+  if (!order || !requestToken || order.accessToken !== requestToken) {
+    return new Response(NOT_FOUND, { status: 404 })
+  }
+
+  const raw = order.result?.resultText?.trim()
   if (!raw) {
     return new Response(NOT_FOUND, { status: 404 })
   }

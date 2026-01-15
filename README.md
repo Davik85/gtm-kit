@@ -34,3 +34,12 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Access-protected result links
+
+Result pages require a secure access token. To verify manually:
+
+1. Start the dev server with `npm run dev`.
+2. Create an order and capture the `accessToken` returned from `/api/orders/create`.
+3. Open `/order/<orderId>/result?token=<accessToken>` and confirm the result loads.
+4. Remove the `token` query param (or change it) and confirm the page returns a 404/access denied.
