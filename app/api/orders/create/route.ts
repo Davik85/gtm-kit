@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import crypto from 'node:crypto'
 import { prisma } from '@/lib/db/prisma'
 import { InvalidCountryError, normalizeCountry } from '@/lib/country/normalizeCountry'
 
@@ -14,6 +15,7 @@ const allowedTiers = new Set(['base', 'plus', 'pro'] as const)
 type OrderTier = 'base' | 'plus' | 'pro'
 
 const normalizeEmail = (value: string) => value.trim().toLowerCase()
+const createAccessToken = () => crypto.randomBytes(32).toString('hex')
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as CreateOrderPayload
   const email = typeof body.email === 'string' ? normalizeEmail(body.email) : ''
@@ -62,6 +64,7 @@ export async function POST(request: Request) {
     data: {
       status: 'created',
       tier,
+      accessToken: createAccessToken(),
       promptKey: 'gtm_eu_core',
       promptVersion: 1,
       customerId: customer.id,
@@ -69,5 +72,9 @@ export async function POST(request: Request) {
     },
   })
 
-  return NextResponse.json({ orderId: order.id, status: order.status })
+  return NextResponse.json({
+    orderId: order.id,
+    status: order.status,
+    accessToken: order.accessToken,
+  })
 }

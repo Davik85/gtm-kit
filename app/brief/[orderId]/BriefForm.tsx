@@ -2,8 +2,9 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useRef, useState, type ChangeEvent, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import CountrySelect from '@/components/CountrySelect'
+import { buildOrderResultPath, orderAccessTokenStorageKey } from '@/lib/orderLinks'
 
 type BriefFields = {
   product: string
@@ -37,9 +38,14 @@ export default function BriefForm({
   const [countryCode, setCountryCode] = useState<string | null>(
     initialCountryCode ?? null,
   )
+  const [accessToken, setAccessToken] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const isSubmittingRef = useRef(false)
+
+  useEffect(() => {
+    setAccessToken(sessionStorage.getItem(orderAccessTokenStorageKey(orderId)))
+  }, [orderId])
 
   const handleChange = (key: keyof BriefFields) => (event: ChangeEvent<HTMLInputElement>) => {
     setFields((prev) => ({ ...prev, [key]: event.target.value }))
@@ -82,7 +88,11 @@ export default function BriefForm({
         return
       }
 
-      router.push(`/result/${orderId}`)
+      const storedToken = sessionStorage.getItem(orderAccessTokenStorageKey(orderId))
+      const resultPath = storedToken
+        ? buildOrderResultPath(orderId, storedToken)
+        : `/order/${orderId}/result`
+      router.push(resultPath)
     } catch (fetchError) {
       console.error(fetchError)
       setError(NETWORK_ERROR_MESSAGE)
@@ -108,11 +118,18 @@ export default function BriefForm({
           <div className="space-y-2 rounded border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
             <p className="font-medium">{RESULT_ALREADY_GENERATED_MESSAGE}</p>
             <p>Brief edits are locked once a result is generated.</p>
-            <p>
-              <Link className="underline underline-offset-4" href={`/result/${orderId}`}>
-                View result
-              </Link>
-            </p>
+            {accessToken ? (
+              <p>
+                <Link
+                  className="underline underline-offset-4"
+                  href={buildOrderResultPath(orderId, accessToken)}
+                >
+                  View result
+                </Link>
+              </p>
+            ) : (
+              <p>Check your email for the secure result link.</p>
+            )}
           </div>
         ) : null}
       </header>

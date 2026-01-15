@@ -32,8 +32,10 @@ const logResultStatus = ({
 
 export async function GET(request: Request, ctx: RouteContext) {
   const { orderId: paramOrderId } = await ctx.params
-  const queryOrderId = new URL(request.url).searchParams.get('orderId') ?? ''
-  const pathname = new URL(request.url).pathname
+  const url = new URL(request.url)
+  const queryOrderId = url.searchParams.get('orderId') ?? ''
+  const accessToken = url.searchParams.get('token')?.trim() ?? ''
+  const pathname = url.pathname
   const parts = pathname.split('/').filter(Boolean)
   const resultsIndex = parts.lastIndexOf('results')
   const pathOrderId = resultsIndex >= 0 ? parts[resultsIndex + 1] ?? '' : ''
@@ -61,13 +63,14 @@ export async function GET(request: Request, ctx: RouteContext) {
     select: {
       id: true,
       status: true,
+      accessToken: true,
       result: { select: { id: true, resultText: true, updatedAt: true } },
     },
   })
 
-  if (!order) {
-    logResultStatus({ orderId, status: 'not_found' })
-    return jsonResponse({ ok: false, code: 'ORDER_NOT_FOUND' }, { status: 404 })
+  if (!order || !accessToken || order.accessToken !== accessToken) {
+    logResultStatus({ orderId, status: 'access_denied' })
+    return jsonResponse({ ok: false, code: 'ACCESS_DENIED' }, { status: 404 })
   }
 
   if (order.result?.resultText) {
