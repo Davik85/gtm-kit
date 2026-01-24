@@ -4,6 +4,7 @@ import { normalizePlanToMarkdown } from '@/lib/formatPlan'
 import { openai } from '@/lib/openaiClient'
 import { buildOrderResultUrl } from '@/lib/orderLinks.server'
 import { PROMPTS, type PromptKey, getPromptTemplate } from '@/lib/prompts/registry'
+import { sendResultEmail } from '@/lib/email'
 
 export const runtime = 'nodejs'
 
@@ -239,7 +240,7 @@ export async function POST(request: Request) {
         promptKey: true,
         promptVersion: true,
         countryCode: true,
-        customer: { select: { countryCode: true } },
+        customer: { select: { countryCode: true, email: true } },
         brief: { select: { payload: true } },
         result: {
           select: {
@@ -519,17 +520,35 @@ export async function POST(request: Request) {
     }
 
     logGenerateStatus({ orderId, status: 'ready', resultId: createdResultId })
-      return jsonResponse({
-        ok: true,
-        orderId,
-        status: 'ready',
-        resultId: createdResultId,
-        reused: false,
-        resultLink,
-        resultText,
-        chunksCount: chunks.length,
-        totalChars: resultText.length,
-        finalFinishReason: finishReason ?? 'unknown',
+    if (order.customer?.email) {
+      try {
+        await sendResultEmail({
+          to: order.customer.email,
+          orderId,
+          accessToken: order.accessToken,
+          replyTo: process.env.EMAIL_REPLY_TO,
+        })
+
+        await prisma.result.update({
+          where: { orderId },
+          data: { emailSentAt: new Date() },
+        })
+      } catch (error) {
+        const errorMessage = toErrorMessage(error)
+        console.error('Failed to send result email', { orderId, error: errorMessage })
+      }
+    }
+    return jsonResponse({
+      ok: true,
+      orderId,
+      status: 'ready',
+      resultId: createdResultId,
+      reused: false,
+      resultLink,
+      resultText,
+      chunksCount: chunks.length,
+      totalChars: resultText.length,
+      finalFinishReason: finishReason ?? 'unknown',
     })
   } catch (error) {
     const errorMessage = toErrorMessage(error)
