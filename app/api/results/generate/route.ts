@@ -28,6 +28,7 @@ const MAX_CONTINUATIONS = 4
 const CONTINUATION_TAIL_CHARS = 1000
 const ORDER_STATUS_GENERATING = 'generating'
 const ORDER_STATUS_BRIEF_SUBMITTED = 'brief_submitted'
+const ORDER_STATUS_PAID = 'paid'
 const ORDER_STATUS_GENERATED = 'generated'
 const ORDER_STATUS_ERROR = 'error'
 const ERROR_INVALID_ORDER_ID = 'Invalid orderId'
@@ -308,7 +309,7 @@ export async function POST(request: Request) {
       )
     }
 
-    if (order.status !== ORDER_STATUS_BRIEF_SUBMITTED) {
+    if (![ORDER_STATUS_BRIEF_SUBMITTED, ORDER_STATUS_PAID].includes(order.status)) {
       logGenerateStatus({ orderId, status: 'pending' })
       return jsonResponse(
         { ok: true, orderId, status: 'pending', code: 'awaiting_requirements' },
@@ -323,7 +324,7 @@ export async function POST(request: Request) {
     }
 
     const locked = await prisma.order.updateMany({
-      where: { id: orderId, status: ORDER_STATUS_BRIEF_SUBMITTED },
+      where: { id: orderId, status: { in: [ORDER_STATUS_BRIEF_SUBMITTED, ORDER_STATUS_PAID] } },
       data: { status: ORDER_STATUS_GENERATING },
     })
 
