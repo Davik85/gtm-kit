@@ -22,6 +22,13 @@ const parseSignatureHeader = (signature: string) => {
   return Object.fromEntries(entries)
 }
 
+const safeCompare = (left: string, right: string) => {
+  const leftBuffer = Buffer.from(left)
+  const rightBuffer = Buffer.from(right)
+  if (leftBuffer.length !== rightBuffer.length) return false
+  return crypto.timingSafeEqual(leftBuffer, rightBuffer)
+}
+
 const isSignatureValid = (signature: string, rawBody: string, secret: string) => {
   const computed = crypto.createHmac('sha256', secret).update(rawBody).digest('hex')
   const expectedHex = computed.toLowerCase()
@@ -32,13 +39,6 @@ const isSignatureValid = (signature: string, rawBody: string, secret: string) =>
   const matchesBase64 = safeCompare(normalized, expectedBase64)
 
   return matchesHex || matchesBase64
-}
-
-const safeCompare = (left: string, right: string) => {
-  const leftBuffer = Buffer.from(left)
-  const rightBuffer = Buffer.from(right)
-  if (leftBuffer.length !== rightBuffer.length) return false
-  return crypto.timingSafeEqual(leftBuffer, rightBuffer)
 }
 
 type PaddleWebhookEvent = {
@@ -76,6 +76,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid payload' }, { status: 400 })
   }
 
+  // Prisma expects JSON-serializable value (InputJsonValue), not unknown.
+  const eventJson = event as unknown as Prisma.InputJsonValue
+
   const eventId =
     event.event_id?.trim() ||
     event.data?.id?.trim() ||
@@ -88,7 +91,7 @@ export async function POST(request: Request) {
         provider: PROVIDER,
         eventId,
         eventType,
-        payload: event as unknown,
+        payload: eventJson,
       },
     })
   } catch (error) {
@@ -105,11 +108,12 @@ export async function POST(request: Request) {
 
   if (orderId) {
     if (eventType === 'transaction.completed') {
-      await prisma.$transaction(async (tx) => {
+      await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         if (transactionId) {
           const existingPayment = await tx.payment.findUnique({
             where: { paddleTransactionId: transactionId },
           })
+
           if (existingPayment) {
             await tx.payment.update({
               where: { id: existingPayment.id },
@@ -121,7 +125,7 @@ export async function POST(request: Request) {
                 orderId,
                 paddleTransactionId: transactionId,
                 status: 'completed',
-                payload: event as unknown,
+                payload: eventJson,
               },
             })
           }

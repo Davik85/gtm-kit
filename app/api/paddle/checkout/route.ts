@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import type { Payment } from '@prisma/client'
 import { prisma } from '@/lib/db/prisma'
 import { getPriceIdByTier, paddleRequest } from '@/lib/paddleApi'
 
@@ -41,9 +42,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: ERROR_ORDER_NOT_FOUND }, { status: 404 })
   }
 
-  const completedPayment = order.payments.find((payment) => payment.status === 'completed')
+  const completedPayment = order.payments.find((payment: Payment) => payment.status === 'completed')
   if (order.status === 'paid' || completedPayment) {
-    const existingUrl = getCheckoutUrlFromPayload(completedPayment?.payload)
+    const existingUrl = getCheckoutUrlFromPayload(completedPayment?.payload as unknown)
     if (existingUrl && completedPayment?.paddleTransactionId) {
       return NextResponse.json({
         checkoutUrl: existingUrl,
@@ -54,12 +55,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: ERROR_ALREADY_PAID }, { status: 409 })
   }
 
-  const existingPayment = order.payments.find((payment) =>
+  const existingPayment = order.payments.find((payment: Payment) =>
     ['created', 'draft'].includes(payment.status),
   )
 
   if (existingPayment?.paddleTransactionId) {
-    const existingUrl = getCheckoutUrlFromPayload(existingPayment.payload)
+    const existingUrl = getCheckoutUrlFromPayload(existingPayment.payload as unknown)
     if (existingUrl) {
       return NextResponse.json({
         checkoutUrl: existingUrl,
