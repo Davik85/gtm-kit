@@ -1,7 +1,6 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import CountrySelect from '@/components/CountrySelect'
 import { buildOrderResultPath, orderAccessTokenStorageKey } from '@/lib/orderLinks'
@@ -22,13 +21,13 @@ type BriefFormProps = {
 const RESULT_ALREADY_GENERATED_MESSAGE = 'Result already generated.'
 const SUBMIT_ERROR_MESSAGE = 'Unable to submit brief. Please try again.'
 const NETWORK_ERROR_MESSAGE = 'Network error. Please try again.'
+const PAYMENT_ERROR_MESSAGE = 'Unable to start checkout. Please try again.'
 
 export default function BriefForm({
   orderId,
   initialCountryCode,
   isGenerated = false,
 }: BriefFormProps) {
-  const router = useRouter()
   const [fields, setFields] = useState<BriefFields>({
     product: '',
     market: '',
@@ -88,11 +87,25 @@ export default function BriefForm({
         return
       }
 
-      const storedToken = sessionStorage.getItem(orderAccessTokenStorageKey(orderId))
-      const resultPath = storedToken
-        ? buildOrderResultPath(orderId, storedToken)
-        : `/order/${orderId}/result`
-      router.push(resultPath)
+      const checkoutResponse = await fetch('/api/paddle/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ orderId }),
+      })
+
+      const checkoutData = (await checkoutResponse.json().catch(() => ({}))) as {
+        error?: string
+        checkoutUrl?: string
+      }
+
+      if (!checkoutResponse.ok || !checkoutData.checkoutUrl) {
+        setError(checkoutData.error || PAYMENT_ERROR_MESSAGE)
+        return
+      }
+
+      window.location.href = checkoutData.checkoutUrl
     } catch (fetchError) {
       console.error(fetchError)
       setError(NETWORK_ERROR_MESSAGE)
