@@ -1,45 +1,101 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# LaunchStencil GTM-Kit
 
-## Getting Started
+LaunchStencil (GTM-Kit) is a Next.js application that collects a marketing brief, takes payment via Paddle, generates a go-to-market plan using OpenAI, and delivers it via a token-protected result page and email.
 
-First, run the development server:
+## Current features implemented
+- Order creation with email capture and optional country/tier.
+- Brief submission and storage in PostgreSQL via Prisma.
+- Paddle checkout creation and webhook processing.
+- OpenAI generation with prompt templates and continuation support.
+- Token-gated result page + JSON API + downloadable DOCX/text output.
+- SMTP email delivery of result links with resend throttling.
 
+## Quick start (local)
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+2. Start Postgres locally (example via Docker):
+   ```bash
+   docker compose up -d
+   ```
+3. Set environment variables (see `docs/ENV.md`).
+4. Run Prisma migrations and generate client:
+   ```bash
+   npx prisma migrate dev
+   npx prisma generate
+   ```
+5. Start the dev server:
+   ```bash
+   npm run dev
+   ```
+6. Visit `http://localhost:3000`.
+
+## Required env vars (summary)
+See `docs/ENV.md` for full details and examples.
+
+**Core**
+- `DATABASE_URL`
+- `APP_BASE_URL`
+
+**OpenAI**
+- `OPENAI_API_KEY`
+
+**Paddle**
+- `PADDLE_API_KEY`, `PADDLE_WEBHOOK_SECRET`
+- `PADDLE_PRICE_BASE`, `PADDLE_PRICE_PLUS`, `PADDLE_PRICE_PRO`
+
+**Email (SMTP)**
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`
+- `EMAIL_FROM`, `EMAIL_REPLY_TO`
+
+## Build & test commands
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run build
+npm run lint
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Key routes
+See `docs/ROUTES.md` for the full route map.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+**Pages**
+- `/` landing, `/start`, `/brief/[orderId]`, `/order/[orderId]/processing`, `/order/[orderId]/result`, `/result/[orderId]`, `/pricing`, `/legal/*`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+**API**
+- `/api/orders/create`
+- `/api/brief/submit`
+- `/api/paddle/checkout`, `/api/paddle/webhook`
+- `/api/results/generate`, `/api/results/[orderId]`
+- `/api/orders/[orderId]/download`, `/api/results/[orderId]/download`
+- `/api/orders/[orderId]/email/resend`
 
-## Learn More
+## Known limitations / TODO
+- Webhook-triggered generation does not include `accessToken`, so `/api/results/generate` will reject the call.
+- No rate limiting on public API routes.
+- Email resend endpoint does not require a token or auth.
+- `Order` statuses `delivered` and `refunded` are defined but never set.
+- No background job/queue; generation runs inline in API request.
 
-To learn more about Next.js, take a look at the following resources:
+## Documentation
+- Architecture: `docs/ARCHITECTURE.md`
+- Routes: `docs/ROUTES.md`
+- Database: `docs/DB.md`
+- Environment: `docs/ENV.md`
+- Payments (Paddle): `docs/PAYMENTS_PADDLE.md`
+- Email: `docs/EMAIL.md`
+- Security: `docs/SECURITY.md`
+- Deployment: `docs/DEPLOYMENT.md`
+- Troubleshooting: `docs/TROUBLESHOOTING.md`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-
-## Access-protected result links
-
-Result pages require a secure access token. To verify manually:
-
-1. Start the dev server with `npm run dev`.
-2. Create an order and capture the `accessToken` returned from `/api/orders/create`.
-3. Open `/order/<orderId>/result?token=<accessToken>` and confirm the result loads.
-4. Remove the `token` query param (or change it) and confirm the page returns a 404/access denied.
+## Current Implementation Snapshot
+- ✅ Implemented
+  - Order creation, brief submission, Paddle checkout, webhook processing
+  - OpenAI generation with token-protected result access
+  - Email delivery + DOCX download
+- ⚠️ Implemented but needs hardening
+  - Webhook-triggered generation missing access token
+  - Public endpoints without rate limiting or auth
+  - No delivery status tracking despite `delivered` enum value
+- ❌ Not implemented yet (planned)
+  - Background job queue / retries for generation and email
+  - Admin or customer dashboard
